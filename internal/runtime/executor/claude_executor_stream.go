@@ -95,6 +95,11 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 	if rebuildMidSystemMessageEnabled(e.cfg, auth) {
 		body = rebuildMidSystemMessagesToTopLevel(body)
 	}
+	// Opt-in tool search for Codex: must run before cloaking/renaming while
+	// MCP tool names are still the original mcp__ names.
+	if e.cfg != nil && e.cfg.ClaudeToolSearch && from == sdktranslator.FormatOpenAIResponse {
+		body = applyClaudeToolSearch(body)
+	}
 
 	// Apply cloaking (system prompt injection, fake user ID, sensitive word obfuscation)
 	// based on client type and configuration.

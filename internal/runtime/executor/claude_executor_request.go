@@ -463,6 +463,51 @@ func claudeBodyUsesAdvancedToolUse(body []byte) bool {
 	return false
 }
 
+// applyClaudeToolSearch marks Codex MCP/app tools (untyped mcp__ tools) as
+// defer_loading and appends Claude's BM25 tool search, so core tools stay loaded
+// and large MCP catalogs load on demand. Clients managing tool search themselves,
+// Haiku, and small catalogs (<10 candidates) are left untouched.
+func applyClaudeToolSearch(body []byte) []byte {
+	tools := gjson.GetBytes(body, "tools")
+	if !tools.IsArray() || isClaudeHaikuModel(gjson.GetBytes(body, "model").String()) {
+		return body
+	}
+	// Tools forced by tool_choice or already called in history stay loaded, so
+	// earlier finds survive across turns (search blocks are not replayed).
+	keep := map[string]bool{}
+	if name := gjson.GetBytes(body, "tool_choice.name").String(); name != "" {
+		keep[name] = true
+	}
+	gjson.GetBytes(body, "messages").ForEach(func(_, msg gjson.Result) bool {
+		msg.Get("content").ForEach(func(_, block gjson.Result) bool {
+			if block.Get("type").String() == "tool_use" {
+				keep[block.Get("name").String()] = true
+			}
+			return true
+		})
+		return true
+	})
+	var candidates []int
+	for i, tool := range tools.Array() {
+		if strings.HasPrefix(tool.Get("type").String(), "tool_search_tool_") || tool.Get("defer_loading").Exists() {
+			return body
+		}
+		name := tool.Get("name").String()
+		if tool.Get("type").Exists() || !strings.HasPrefix(name, "mcp__") || tool.Get("cache_control").Exists() || keep[name] {
+			continue
+		}
+		candidates = append(candidates, i)
+	}
+	if len(candidates) < 10 {
+		return body
+	}
+	for _, i := range candidates {
+		body, _ = sjson.SetBytes(body, fmt.Sprintf("tools.%d.defer_loading", i), true)
+	}
+	body, _ = sjson.SetRawBytes(body, "tools.-1", []byte(`{"type":"tool_search_tool_bm25_20251119","name":"tool_search_tool_bm25"}`))
+	return body
+}
+
 // claudeBodyHasAdvisorTool reports whether the request body declares an
 // advisor server tool.
 func claudeBodyHasAdvisorTool(body []byte) bool {
@@ -1204,6 +1249,10 @@ func applyClaudeHeadersWithNativeProfile(
 		// The explicit speed=fast request still needs its protocol beta.
 		if strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, "speed").String()), "fast") {
 			appendBeta(claudeFastModeBeta)
+		}
+		// Tool search (e.g. claude-tool-search) is unusable without its beta.
+		if claudeBodyUsesAdvancedToolUse(body) {
+			appendBeta(claudeAdvancedToolUseBeta)
 		}
 		for _, beta := range extraBetas {
 			appendBeta(beta)
