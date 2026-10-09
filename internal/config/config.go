@@ -167,6 +167,10 @@ type Config struct {
 	// the auth/OAuth token file). Default false preserves the per-client "auto" behavior.
 	DisableClaudeCloakMode bool `yaml:"disable-claude-cloak-mode" json:"disable-claude-cloak-mode"`
 
+	// ClaudeToolSearch defers Codex MCP/app tools on Claude requests behind
+	// Claude's BM25 tool search, keeping core Codex tools loaded. Default false.
+	ClaudeToolSearch bool `yaml:"claude-tool-search" json:"claude-tool-search"`
+
 	// OpenAICompatibility defines OpenAI API compatibility configurations for external providers.
 	OpenAICompatibility []OpenAICompatibility `yaml:"openai-compatibility" json:"openai-compatibility"`
 

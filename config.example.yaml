@@ -396,6 +396,11 @@ upstream:
     # API-key overrides use api-keys.claude[].keys[].cloak.mode.
     disable-claude-cloak-mode: false
 
+    # When true, Codex (OpenAI Responses) requests sent to Claude mark MCP/app tools
+    # (mcp__*) as defer_loading and add Claude's BM25 tool search, keeping core Codex
+    # tools loaded. Applies only with 10+ such tools; skipped for Haiku. Default false.
+    claude-tool-search: false
+
     # When true, return original model IDs in Anthropic model list responses instead of cloaked IDs.
     disable-cloaking-model-list: false
 
