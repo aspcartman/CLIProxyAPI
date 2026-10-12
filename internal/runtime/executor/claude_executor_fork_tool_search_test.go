@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
@@ -134,6 +135,18 @@ func TestClaudeExecutor_ToolSearchForCodexRequests(t *testing.T) {
 				t.Fatalf("disabled setting changed tools: %s", gjson.GetBytes(upstream.body, "tools").Raw)
 			}
 		})
+	}
+}
+
+// With both upstream.claude.tool-search and the fork's claude-tool-search on,
+// upstream's native deferral wins and the fork must not add its BM25 tool.
+func TestClaudeToolSearch_YieldsToUpstreamNativeToolSearch(t *testing.T) {
+	enableClaudeToolSearchForTest(t, true)
+	cfg := &config.Config{ClaudeToolSearch: true}
+	body := captureNativeToolSearchBody(t, cfg, sendNativeToolSearchExecute, nativeToolSearchAuth(nil), "claude-sonnet-4-5", []byte(nativeToolSearchResponsesPayload), nil)
+	assertNativeToolSearchBody(t, body)
+	if n := countSearchTools(body); n != 0 {
+		t.Fatalf("fork added %d BM25 search tools on top of native tool search: %s", n, gjson.GetBytes(body, "tools").Raw)
 	}
 }
 

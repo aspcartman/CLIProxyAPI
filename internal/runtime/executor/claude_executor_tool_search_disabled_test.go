@@ -38,6 +38,9 @@ const toolSearchExecutorGoldenPayload = `{"model":"claude-sonnet-4-5","input":[`
 
 var toolSearchExecutorGoldenCCH = regexp.MustCompile(`cch=[0-9a-f]+;`)
 
+// Fork: OAuth cloaking injects today's date, so the golden is date-agnostic.
+var toolSearchExecutorGoldenDate = regexp.MustCompile(`Today's date is \d{4}-\d{2}-\d{2}\.`)
+
 // renderToolSearchExecutorGolden captures the upstream bodies the Claude
 // executor sends for toolSearchExecutorGoldenPayload on every request path.
 func renderToolSearchExecutorGolden(t *testing.T) map[string]string {
@@ -108,7 +111,8 @@ func TestClaudeExecutor_ToolSearchDisabledMatchesDevGolden(t *testing.T) {
 		t.Fatalf("rendered %d bodies, golden has %d", len(got), len(want))
 	}
 	for name, body := range got {
-		if body != want[name] {
+		body = toolSearchExecutorGoldenDate.ReplaceAllString(body, "Today's date is DATE.")
+		if body != toolSearchExecutorGoldenDate.ReplaceAllString(want[name], "Today's date is DATE.") {
 			t.Errorf("%s differs from dev\n got: %s\nwant: %s", name, body, want[name])
 		}
 	}
