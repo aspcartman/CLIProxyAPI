@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
@@ -38,13 +39,21 @@ const toolSearchExecutorGoldenPayload = `{"model":"claude-sonnet-4-5","input":[`
 
 var toolSearchExecutorGoldenCCH = regexp.MustCompile(`cch=[0-9a-f]+;`)
 
-// Fork: OAuth cloaking injects today's date, so the golden is date-agnostic.
-var toolSearchExecutorGoldenDate = regexp.MustCompile(`Today's date is \d{4}-\d{2}-\d{2}\.`)
+// toolSearchExecutorGoldenDate is the calendar day the dev golden was recorded
+// on. OAuth cloaking injects a currentDate reminder, so the render pins the
+// executor clock to this day to keep the golden comparison date-independent.
+var toolSearchExecutorGoldenDate = time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC)
 
 // renderToolSearchExecutorGolden captures the upstream bodies the Claude
 // executor sends for toolSearchExecutorGoldenPayload on every request path.
 func renderToolSearchExecutorGolden(t *testing.T) map[string]string {
 	t.Helper()
+	helps.ResetClaudeDiagnosticsForTest()
+	t.Cleanup(helps.ResetClaudeDiagnosticsForTest)
+	claudeCodeCurrentTimeFunc = func(*config.Config, *cliproxyauth.Auth) time.Time {
+		return toolSearchExecutorGoldenDate
+	}
+	t.Cleanup(func() { claudeCodeCurrentTimeFunc = nil })
 	payload := []byte(toolSearchExecutorGoldenPayload)
 	auths := map[string]map[string]string{
 		"official": {"api_key": "key-123", "cloak_mode": "never"},
@@ -111,8 +120,7 @@ func TestClaudeExecutor_ToolSearchDisabledMatchesDevGolden(t *testing.T) {
 		t.Fatalf("rendered %d bodies, golden has %d", len(got), len(want))
 	}
 	for name, body := range got {
-		body = toolSearchExecutorGoldenDate.ReplaceAllString(body, "Today's date is DATE.")
-		if body != toolSearchExecutorGoldenDate.ReplaceAllString(want[name], "Today's date is DATE.") {
+		if body != want[name] {
 			t.Errorf("%s differs from dev\n got: %s\nwant: %s", name, body, want[name])
 		}
 	}
