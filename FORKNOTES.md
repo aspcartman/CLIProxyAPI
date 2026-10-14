@@ -24,4 +24,7 @@ Remotes: `origin` = upstream `router-for-me/CLIProxyAPI`, `aspcartman` = this fo
 3. `go build ./...`, `go vet ./...`, `go test ./...` (`TestPionMediaRelayBridgesAudioAndDataChannel` is flaky — re-run alone).
 4. `git checkout main && git merge --no-ff codex/upstream-YYYY-MM-DD`; `git push aspcartman main` (never push to `origin`).
 5. Build with `-X main.Version=$(git describe --tags --always)-aspcartman`, back up `~/.local/bin/cliproxyapi` to
-   `~/.cli-proxy-api/backups/`, install via temp file + `mv`, restart LaunchAgent `com.aspcartman.cliproxyapi`, check port 8317.
+   `~/.cli-proxy-api/backups/`, install via temp file + `mv`, then restart with exactly
+   `launchctl kickstart -k gui/$(id -u)/com.aspcartman.cliproxyapi` and check port 8317.
+   Never `bootout`/`unload` + `bootstrap`/`load`: the agent running this procedure talks through this proxy, so it dies
+   after the bootout and the daemon is never started again.
